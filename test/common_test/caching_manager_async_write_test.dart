@@ -64,8 +64,14 @@ void main() {
 final class _SpyIOOverrides extends IOOverrides {
   final List<String> syncCalls = [];
 
+  // Keep the per-file temp folder set in `test/flutter_test_config.dart`.
+  final Directory _systemTemp = Directory.systemTemp;
+
   @override
   File createFile(String path) => _SpyFile(super.createFile(path), syncCalls);
+
+  @override
+  Directory getSystemTempDirectory() => _systemTemp;
 }
 
 /// Delegates to a real [File] and records every blocking call that writes,
