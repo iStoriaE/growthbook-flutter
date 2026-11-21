@@ -164,7 +164,8 @@ class _SpyFile implements File {
       _file.openRead(start, end);
 
   @override
-  IOSink openWrite({FileMode mode = FileMode.write, Encoding encoding = utf8}) =>
+  IOSink openWrite(
+          {FileMode mode = FileMode.write, Encoding encoding = utf8}) =>
       _file.openWrite(mode: mode, encoding: encoding);
 
   @override
