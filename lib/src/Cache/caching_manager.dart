@@ -45,22 +45,39 @@ class CachingManager extends CachingLayer {
     }
 
     final targetPath = await getTargetFile(fileName);
+
+    // Saves of the same file run one after another, so they never share the
+    // temp file at the same time.
+    final previous = _pendingWrites[targetPath] ?? Future<void>.value();
+    final current =
+        previous.then((_) => _writeFile(targetPath, fileName, content));
+    _pendingWrites[targetPath] = current;
+    await current;
+    if (identical(_pendingWrites[targetPath], current)) {
+      _pendingWrites.remove(targetPath);
+    }
+  }
+
+  final Map<String, Future<void>> _pendingWrites = {};
+
+  Future<void> _writeFile(
+      String targetPath, String fileName, Uint8List content) async {
     final tempFile = File('$targetPath.tmp');
 
     try {
-      // Write to temp file first
-      tempFile.writeAsBytesSync(content, flush: true);
+      // Write to temp file first, off the main isolate's thread
+      await tempFile.writeAsBytes(content, flush: true);
 
       // Atomic rename — replaces target file safely
-      tempFile.renameSync(targetPath);
+      await tempFile.rename(targetPath);
 
       logger.i('Content saved successfully to: $fileName');
     } catch (e) {
       logger.e('Failed to save content: $e');
       // Clean up temp file if it exists
       try {
-        if (tempFile.existsSync()) {
-          tempFile.deleteSync();
+        if (await tempFile.exists()) {
+          await tempFile.delete();
         }
       } catch (_) {}
     }
@@ -97,6 +114,8 @@ class CachingManager extends CachingLayer {
 
     try {
       final filePath = await getTargetFile(fileName);
+      // Wait for a save of this file that is still in flight
+      await _pendingWrites[filePath];
       File file = File(filePath);
       if (await file.exists()) {
         return await file.readAsBytes();
